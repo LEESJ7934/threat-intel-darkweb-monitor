@@ -12,11 +12,11 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(PROJECT_ROOT / ".env")
 
-CRAWLER_SCRIPTS = (
-    "gunra_crawler.py",
-    "Black_Shrantac_crawler.py",
-    "dragonforce_crawler.py",
-    "bitlock_crawler.py",
+CRAWLER_MODULES = (
+    "crawling.gunra_crawler",
+    "crawling.Black_Shrantac_crawler",
+    "crawling.dragonforce_crawler",
+    "crawling.bitlock_crawler",
 )
 
 KST = timezone(timedelta(hours=9))
@@ -60,24 +60,25 @@ def log(message: str) -> None:
     )
 
 
-def run_crawler(script_name: str) -> None:
-    script_path = (
-        PROJECT_ROOT
-        / "crawling"
-        / script_name
-    )
-
-    if not script_path.is_file():
-        log(f"실행 파일 없음: {script_name}")
+def run_crawler(module_name: str) -> None:
+    if module_name not in CRAWLER_MODULES:
+        log("등록되지 않은 크롤러 모듈")
         return
 
-    log(f"크롤러 실행 시작: {script_name}")
+    script_path = PROJECT_ROOT.joinpath(*module_name.split(".")).with_suffix(".py")
+
+    if not script_path.is_file():
+        log(f"실행 파일 없음: {module_name}")
+        return
+
+    log(f"크롤러 실행 시작: {module_name}")
 
     try:
         result = subprocess.run(
             [
                 sys.executable,
-                str(script_path),
+                "-m",
+                module_name,
             ],
             cwd=PROJECT_ROOT,
             capture_output=True,
@@ -88,14 +89,14 @@ def run_crawler(script_name: str) -> None:
 
     except subprocess.TimeoutExpired:
         log(
-            f"크롤러 제한시간 초과: {script_name} "
+            f"크롤러 제한시간 초과: {module_name} "
             f"({CRAWLER_TIMEOUT_SECONDS}초)"
         )
         return
 
     except OSError as error:
         log(
-            f"크롤러 실행 실패: {script_name} "
+            f"크롤러 실행 실패: {module_name} "
             f"({type(error).__name__})"
         )
         return
@@ -105,7 +106,7 @@ def run_crawler(script_name: str) -> None:
 
     if result.returncode == 0:
         log(
-            f"크롤러 실행 완료: {script_name}"
+            f"크롤러 실행 완료: {module_name}"
         )
         return
 
@@ -116,7 +117,7 @@ def run_crawler(script_name: str) -> None:
         )
 
     log(
-        f"크롤러 비정상 종료: {script_name} "
+        f"크롤러 비정상 종료: {module_name} "
         f"(종료 코드 {result.returncode})"
     )
 
@@ -133,10 +134,10 @@ def build_scheduler() -> BlockingScheduler:
 
     first_run = datetime.now(KST)
 
-    for index, script_name in enumerate(
-        CRAWLER_SCRIPTS
+    for index, module_name in enumerate(
+        CRAWLER_MODULES
     ):
-        job_id = Path(script_name).stem
+        job_id = module_name.rsplit(".", 1)[1]
 
         scheduler.add_job(
             run_crawler,
@@ -144,7 +145,7 @@ def build_scheduler() -> BlockingScheduler:
                 minutes=CRAWLER_INTERVAL_MINUTES,
                 timezone=KST,
             ),
-            args=[script_name],
+            args=[module_name],
             id=job_id,
             name=f"{job_id} crawler",
             coalesce=True,
