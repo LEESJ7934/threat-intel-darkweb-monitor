@@ -1,90 +1,40 @@
-#dragonforce 사이트 크롤링
-from selenium.webdriver.common.by import By
-import time
-from selenium import webdriver
-from datetime import datetime, timezone, timedelta
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from pymongo import MongoClient
-from dotenv import load_dotenv
-import os
-import hashlib
-# .env 파일 불러오기
-load_dotenv()
+"""Dragonforce metadata parser; retain the observed description and publication date."""
+from crawling.common import crawl_page, parse_records, run_main
+from crawling.models import UNKNOWN, legacy_id, text_at
 
-# 환경변수 읽기
-MONGO_URI = os.getenv("DB_URI")
-DB_NAME = os.getenv("DB_NAME")
-
-# MongoDB 연결
-client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
+SOURCE = "dragonforce"
+SOURCE_URL = "http://xjhmtitnrdrgzw4vmsghirdoo2fk35a3tzj4enlmah4pvehdspydsiyd.onion/blog"
+ITEM_SELECTOR = ".publications-list__publication"
 
 
-#동적 크롤링
-headers = {'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36'}
-chrome_options = Options()
-
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=chrome_options)
-chrome_options.add_argument("--proxy-server=socks5://127.0.0.1:9150")
-chrome_options.add_argument("--headless")
-
-now_utc = datetime.now(timezone.utc)
-real_time = now_utc + timedelta(hours=9)
-driver = webdriver.Chrome(service=service, options=chrome_options)
-
-############################################## 크롤링 공통 코드#################################################################
-
-
-driver.get("http://z3wqggtxft7id3ibr7srivv5gjof5fwg76slewnzwwakjuf3nlhukdid.onion/blog")
-time.sleep(1)
+def _parse_item(item):
+    company_name = text_at(item, ".list-publication__name", required=True)
+    description = text_at(item, ".list-publication__description", missing=UNKNOWN)
+    data_size = text_at(
+        item, "p.publication-addictional__row:last-of-type span.addictional-row__text", missing=UNKNOWN)
+    company_url = text_at(item,
+        "div.list-publication__addictional p.publication-addictional__row "
+        "a.addiction-row__text.addictional-row__link")
+    return {
+        "_id": legacy_id("dragonforce_", company_name, description, data_size),
+        "company_name": company_name, "company_url": company_url, "data_size": data_size,
+        "description": description,
+        "publication_date": text_at(item, ".publication-footer__date"),
+    }
 
 
-
-contents = driver.find_elements(By.CLASS_NAME, "publications-list__publication")
-collection = db['leaked_data']
-
-try:
-    for i in contents:
-        try:
-            company_names = i.find_element(By.CLASS_NAME, "list-publication__name").text.strip()
-            company_url = i.find_element(By.CSS_SELECTOR, "div.list-publication__addictional p.publication-addictional__row a.addiction-row__text.addictional-row__link").text.strip()
-            data_size = i.find_element(By.CSS_SELECTOR, "p.publication-addictional__row:last-of-type span.addictional-row__text").text.strip()
-            description = i.find_element(By.CLASS_NAME, "list-publication__description").text.strip()
-            publication_date = i.find_element(By.CLASS_NAME, "publication-footer__date").text.strip()
-            raw_id = f"{company_names}_{description}_{data_size}"
-            hash_id = hashlib.md5(raw_id.encode("utf-8")).hexdigest()
-            doc = {
-                "_id": "dragonforce_" + hash_id,
-                "scraped_time": real_time,
-
-                "company_name": company_names,
-                "company_url" : company_url,
-                "country"    : "unknown",
-
-                "data_contents" : "unknown",
-                "data_size" : data_size,
-                "publication_date" : "unknwon",
-
-                "description" : "unknown", 
-
-                }
-        
-        except Exception as e:
-            print(f"크롤링 중 오류 발생: {e}")
-
-        collection.update_one(
-            {"_id": doc["_id"]},  
-            {"$set": doc},       
-            upsert=True           
-            )
-        
-        
-    print(" -> Saved to MongoDB")
-except Exception as e:
-    print(" -> MongoDB insert error:", e)
+def parse_html(html, scraped_time=None) -> list[dict]:
+    return parse_records(html, selector=ITEM_SELECTOR, source=SOURCE, source_url=SOURCE_URL,
+                         parse_item=_parse_item, scraped_time=scraped_time)
 
 
+def crawl(config=None) -> int:
+    return crawl_page(source_url=SOURCE_URL, selector=ITEM_SELECTOR, parser=parse_html, config=config)
 
+
+def main() -> int:
+    return run_main(SOURCE, crawl)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
