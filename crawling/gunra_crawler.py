@@ -2,7 +2,7 @@
 from crawling.common import crawl_page, parse_records, run_main
 from crawling.models import UNKNOWN, legacy_id, text_at
 
-SOURCE = "SafePay"
+SOURCE = "gunra"
 SOURCE_URL = "http://safepaypfxntwixwjrlcscft433ggemlhgkkdupi2ynhtcmvdgubmoyd.onion/"
 ITEM_SELECTOR = ".tile"
 
