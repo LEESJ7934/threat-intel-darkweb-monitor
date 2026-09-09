@@ -2,8 +2,8 @@
 from crawling.common import crawl_page, parse_records, run_main
 from crawling.models import UNKNOWN, legacy_id, text_at
 
-SOURCE = "black_shrantac"
-SOURCE_URL = "http://jvkpexgkuaw5toiph7fbgucycvnafaqmfvakymfh5pdxepvahw3xryqd.onion/"
+SOURCE = "ZaWoo"
+SOURCE_URL = "https://fyenuhkq3pfhnbpidj5jm2fl2lryxip4byhg6eozynrnlomu4szf2nyd.onion/"
 ITEM_SELECTOR = ".book-card"
 
 
