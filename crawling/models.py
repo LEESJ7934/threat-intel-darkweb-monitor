@@ -3,10 +3,13 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 import hashlib
 import re
+from urllib.parse import urlsplit, urlunsplit
 
 from bs4 import Comment, NavigableString
 
 UNKNOWN = "unknown"
+METADATA_FIELDS = ("company_name", "company_url", "country", "data_contents", "data_size",
+                   "publication_date", "description", "source_url")
 BLOCK_TAGS = {"div", "p", "li", "ul", "ol", "section", "article", "h1", "h2", "h3", "h4", "tr"}
 
 
@@ -16,6 +19,55 @@ def normalize_text(value: str | None) -> str:
     if not isinstance(value, str):
         raise TypeError("Metadata text must be a string")
     return value.strip() or UNKNOWN
+
+
+def metadata_text(value) -> str:
+    """Storage normalization, including the pre-Day 8 missing-value spellings."""
+    if not isinstance(value, str):
+        return UNKNOWN
+    value = " ".join(value.split())
+    return UNKNOWN if value.casefold() in {"", "unknown", "unknwon", "unknonn"} else value
+
+
+def canonical_url(value) -> str | None:
+    """Ignore HTTP(S) scheme/root slash; retain path case, www, port and query.
+
+    No DNS lookup. Invalid URLs or URLs with credentials cannot identify an event.
+    """
+    value = metadata_text(value)
+    if value == UNKNOWN or any(char.isspace() for char in value):
+        return None
+    try:
+        parsed = urlsplit(value if "://" in value else "//" + value)
+        if parsed.scheme and parsed.scheme.casefold() not in {"http", "https"}:
+            return None
+        if not parsed.hostname or parsed.username is not None or parsed.password is not None:
+            return None
+        host = parsed.hostname.casefold()
+        if ":" in host:
+            host = "[" + host + "]"
+        if parsed.port is not None:
+            host += ":" + str(parsed.port)
+        return urlunsplit(("", host, parsed.path.rstrip("/"), parsed.query, parsed.fragment))[2:]
+    except ValueError:
+        return None
+
+
+def normalized_metadata(record) -> dict:
+    """Allowlisted plain metadata only; never copy raw_html, tokens or other extras."""
+    result = {name: metadata_text(record.get(name)) for name in METADATA_FIELDS}
+    for name in ("company_url", "source_url"):
+        # Do not propagate embedded URL credentials or unusable URL placeholders.
+        if canonical_url(result[name]) is None:
+            result[name] = UNKNOWN
+    return result
+
+
+def canonical_metadata(record) -> dict:
+    result = normalized_metadata(record)
+    for name in ("company_url", "source_url"):
+        result[name] = canonical_url(result[name]) or UNKNOWN
+    return result
 
 
 def element_text(element) -> str:
