@@ -1,149 +1,53 @@
+{% extends "mongoDbConnect/base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-        <meta name="description" content="" />
-        <meta name="author" content="" />
-        <title>Tables - Data Dashboard</title>
-
-        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@7.1.2/dist/style.min.css" rel="stylesheet" />
-        <link href="{% static 'css/styles.css' %}" rel="stylesheet" />
-        <script src="https://use.fontawesome.com/releases/v6.3.0/js/all.js" crossorigin="anonymous"></script>
-    </head>
-    <body>
-
-        <main>
-            <div class="container-fluid px-4">
-                <h1 class="mt-4">Data Visualization & Tables</h1>
-                <ol class="breadcrumb mb-4">
-                    <li class="breadcrumb-item"><a href="index.html">Dashboard</a></li>
-                    <li class="breadcrumb-item active">Tables</li>
-                </ol>
-
-                <div class="row">
-                    <div class="col-lg-6">
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <i class="fas fa-chart-bar me-1"></i>
-                                회사별 언급 빈도 시각화
-                            </div>
-                            <div class="card-body">
-                                <canvas id="myBarChart" width="100%" height="50"></canvas>
-                            </div>
-                            <div class="card-footer small text-muted">최신 데이터 기반 시각화</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card mb-4">
-                   <div class="card-header">
-                        <i class="fas fa-table me-1"></i>
-                        최신 MongoDB 데이터 목록
-                    </div>
-                    <div class="card-body">
-                        <table id="datatablesSimple">
-                            <thead>
-                                <tr>
-                                    <th>Company Name</th>
-                                    <th>Company URL</th>
-                                    <th>Description</th>
-                                    <th>Publication Date</th>
-                                    <th>Scraped Time</th>
-                                </tr>
-                            </thead>
-                            <tfoot>
-                                <tr>
-                                    <th>Company Name</th>
-                                    <th>Company URL</th>
-                                    <th>Description</th>
-                                    <th>Publication Date</th>
-                                    <th>Scraped Time</th>
-                                </tr>
-                            </tfoot>
-                            <tbody>
-                                {% for row in data_list %}
-                                <tr>
-                                    <td>{{ row.company_name }}</td>
-                                    <td>{{ row.company_url }}</td>
-                                    <td>{{ row.description }}</td>
-                                    <td>{{ row.publication_date }}</td>
-                                    <td>{{ row.scraped_time }}</td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center">조회된 데이터가 없습니다.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </main>
-        <footer class="py-4 bg-light mt-auto">
-        </footer>
-
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-        <script src="{% static 'js/scripts.js' %}"></script>
-
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
-        <script>
-            // ... (JavaScript 코드 유지) ...
-            const chartDataJson = JSON.parse('{{ chart_data_json|safe }}');
-
-            // 데이터가 존재할 경우에만 차트를 그립니다.
-            if (chartDataJson && chartDataJson.labels && chartDataJson.labels.length > 0) {
-                var ctx = document.getElementById("myBarChart");
-                if (ctx) {
-                    var myBarChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: chartDataJson.labels, // 회사 이름 (labels)
-                            datasets: [{
-                                label: "빈도",
-                                backgroundColor: "rgba(2,117,216,1)",
-                                borderColor: "rgba(2,117,216,1)",
-                                data: chartDataJson.data, // 빈도수 (data)
-                            }],
-                        },
-                        options: {
-                            scales: {
-                                xAxes: [{
-                                    // 기본 Chart.js 설정 유지
-                                    gridLines: { display: false },
-                                    ticks: { maxTicksLimit: 6 }
-                                }],
-                                yAxes: [{
-                                    ticks: {
-                                        min: 0,
-                                        // 정수로 표시되도록 callback 함수를 사용하여 강제합니다.
-                                        callback: function(value) { if (value % 1 === 0) { return value; } },
-                                        maxTicksLimit: 5
-                                    },
-                                    gridLines: { display: true }
-                                }],
-                            },
-                            legend: { display: false } // 범례 숨김
-                        }
-                    });
-                }
-            } else {
-                // 데이터가 없을 경우 캔버스 영역에 메시지 표시
-                document.getElementById("myBarChart").parentElement.innerHTML = "<p class='text-center text-muted'>조회된 데이터가 없어 그래프를 생성할 수 없습니다.</p>";
-            }
-
-            // DataTables 초기화는 마지막에 실행
-            window.addEventListener('DOMContentLoaded', event => {
-                const datatablesSimple = document.getElementById('datatablesSimple');
-                if (datatablesSimple) {
-                    new simpleDatatables.DataTable(datatablesSimple);
-                }
-            });
-        </script>
-
-        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@7.1.2/dist/umd/simple-datatables.min.js" crossorigin="anonymous"></script>
-    </body>
-</html>
+{% block content %}
+<div class="page-heading">
+  <div><div class="eyebrow">THREAT INTELLIGENCE</div><h1>다크웹 사건 대시보드</h1><p>사건 검색 · 메타데이터 변경 추적 · Telegram 알림 현황</p></div>
+</div>
+<section class="panel" aria-label="사건 검색 조건">
+  <form method="get" action="{% url 'latest_data_table' %}" class="filter-form">
+    <div class="filter-field search"><label for="q">검색어</label><input id="q" name="q" value="{{ filters.q }}" maxlength="100" placeholder="회사명, URL, 설명, 유출 내용, 국가"></div>
+    <div class="filter-field"><label for="source">source</label><select id="source" name="source"><option value="">전체 source</option>{% if filters.source and filters.source not in source_options %}<option value="{{ filters.source }}" selected>{{ filters.source }}</option>{% endif %}{% for source in source_options %}<option value="{{ source }}" {% if filters.source == source %}selected{% endif %}>{{ source }}</option>{% endfor %}</select></div>
+    <div class="filter-field"><label for="risk">위험도</label><select id="risk" name="risk"><option value="">전체 위험도</option>{% for level in risk_options %}<option value="{{ level }}" {% if filters.risk == level %}selected{% endif %}>{{ level }}</option>{% endfor %}</select></div>
+    <div class="filter-field"><label for="from">시작일 (UTC)</label><input id="from" type="date" name="from" value="{{ filters.date_from }}"></div>
+    <div class="filter-field"><label for="to">종료일 (UTC)</label><input id="to" type="date" name="to" value="{{ filters.date_to }}"></div>
+    <div class="filter-actions"><button type="submit">검색</button><a class="reset-link" href="{% url 'latest_data_table' %}">초기화</a></div>
+  </form>
+</section>
+{% for error in filter_errors %}<div class="notice error" role="alert">{{ error }}</div>{% endfor %}
+{% if database_error %}<div class="notice error" role="alert">{{ database_error }}</div>{% endif %}
+<p class="range-note">현재 검색 조건의 최신 {{ scan_limit }}개 후보까지 조회합니다. 요약과 분포는 이 조회 범위에 위험도 필터를 적용한 결과입니다.</p>
+{% if candidate_truncated %}<div class="notice warning">검색 후보가 {{ scan_limit }}건을 초과했습니다. 날짜나 검색어로 범위를 좁혀 이전 사건을 조회할 수 있습니다.</div>{% endif %}
+{% if not database_error and not filter_errors %}
+<div class="summary-grid">
+  <section class="summary-card"><div class="summary-label">필터 결과 사건</div><div class="summary-value">{{ summary.event_count }}</div><div class="summary-caption">현재 조회 범위</div></section>
+  <section class="summary-card"><div class="summary-label">source</div><div class="summary-value">{{ summary.source_count }}</div><div class="summary-caption">결과에 포함된 출처</div></section>
+  <section class="summary-card"><div class="summary-label">최근 7일 신규</div><div class="summary-value">{{ summary.new_count }}</div><div class="summary-caption">최초 관찰 시각 기준</div></section>
+  <section class="summary-card"><div class="summary-label">변경 이력 있는 사건</div><div class="summary-value">{{ summary.changed_count }}</div><div class="summary-caption">사건별 중복 제외</div></section>
+  <section class="summary-card"><div class="summary-label">발송 완료 알림</div><div class="summary-value">{{ summary.sent_count }}</div><div class="summary-caption">필터 결과의 SENT 기록</div></section>
+</div>
+<div class="chart-grid">
+  <section class="panel"><div class="panel-heading"><h2>위험도 분포</h2><span class="muted">사건 수</span></div><div id="risk-chart" class="chart" aria-label="위험도별 사건 수"><noscript>{% for item in chart_data.risk %}<p>{{ item.label }}: {{ item.count }}</p>{% endfor %}</noscript></div></section>
+  <section class="panel"><div class="panel-heading"><h2>source별 사건 분포</h2><span class="muted">사건 수</span></div><div id="source-chart" class="chart" aria-label="source별 사건 수"><noscript>{% for item in chart_data.source %}<p>{{ item.label }}: {{ item.count }}</p>{% empty %}<p>표시할 사건이 없습니다.</p>{% endfor %}</noscript></div></section>
+</div>
+<section class="panel">
+  <div class="panel-heading"><h2>사건 목록</h2><span class="muted">최근 관찰순 · 페이지당 25건</span></div>
+  <div class="table-scroll">
+    <table class="event-table">
+      <thead><tr><th>위험도</th><th>회사 · 사건</th><th>source</th><th>국가</th><th>규모</th><th>게시일</th><th>최초 관찰 (UTC)</th><th>최근 관찰 (UTC)</th><th>관찰 횟수</th></tr></thead>
+      <tbody>{% for row in data_list %}
+        <tr>
+          <td><span class="risk-badge risk-{{ row.risk_level|lower }}" title="{{ row.risk_reason }}">{{ row.risk_level }}</span></td>
+          <td class="company-cell">{% if row.link_token %}<a class="company-name" href="{% url 'event_detail' row.link_token %}">{{ row.company_name }}</a>{% else %}<strong>{{ row.company_name }}</strong>{% endif %}<p class="company-description">{{ row.description_preview }}</p>{% if row.company_href %}<a class="company-url" href="{{ row.company_href }}" target="_blank" rel="noopener noreferrer">{{ row.company_url }} ↗</a>{% else %}<span class="company-url">{{ row.company_url }}</span>{% endif %}</td>
+          <td><span class="source-label">{{ row.source }}</span></td><td>{{ row.country }}</td><td>{{ row.data_size }}</td><td>{{ row.publication_date|truncatechars:32 }}</td>
+          <td class="date-cell">{{ row.first_seen|date:"Y-m-d"|default:"-" }}<small>{{ row.first_seen|date:"H:i" }}</small></td><td class="date-cell">{{ row.last_seen|date:"Y-m-d"|default:"-" }}<small>{{ row.last_seen|date:"H:i" }}</small></td><td>{{ row.observation_count|default_if_none:"-" }}</td>
+        </tr>
+      {% empty %}<tr><td colspan="9" class="empty-state">조건에 맞는 사건이 없습니다. 검색어나 필터를 조정하세요.</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <nav class="pagination" aria-label="사건 목록 페이지"><span>{{ page_start }}–{{ page_end }} / {{ summary.event_count }}건</span><div class="page-links">{% if previous_url %}<a class="page-link" href="{{ previous_url }}">이전</a>{% else %}<span class="page-link disabled">이전</span>{% endif %}<span class="page-indicator">{{ page }} / {{ page_count }}</span>{% if next_url %}<a class="page-link" href="{{ next_url }}">다음</a>{% else %}<span class="page-link disabled">다음</span>{% endif %}</div></nav>
+</section>
+{{ chart_data|json_script:"dashboard-chart-data" }}
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/dashboard.js' %}" defer></script>{% endblock %}

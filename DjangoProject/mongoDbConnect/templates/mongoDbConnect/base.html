@@ -1,0 +1,22 @@
+{% load static %}
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>{% block title %}다크웹 위협 인텔리전스{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="{% url 'latest_data_table' %}"><span class="brand-mark">TI</span><span>위협 인텔리전스<span class="brand-caption">ANALYST DASHBOARD</span></span></a>
+      <span class="read-only"><span aria-hidden="true">●</span> 조회 전용</span>
+    </div>
+  </header>
+  <main class="page-shell">{% block content %}{% endblock %}</main>
+  <footer class="site-footer">관찰 시각과 날짜 필터는 UTC 기준입니다. 위험도는 수집된 메타데이터를 바탕으로 분류합니다.</footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
