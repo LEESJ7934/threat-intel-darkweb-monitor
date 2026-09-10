@@ -1,0 +1,77 @@
+{% extends "mongoDbConnect/base.html" %}
+{% block title %}사건 상세 · 다크웹 위협 인텔리전스{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'latest_data_table' %}">← 사건 목록</a>
+{% if database_error %}
+  <div class="notice error" role="alert">{{ database_error }}</div>
+{% elif not_found %}
+  <section class="panel empty-state"><h1>사건을 찾을 수 없습니다.</h1><p>목록으로 돌아가 조회할 사건을 선택하세요.</p></section>
+{% elif event %}
+  <div class="page-heading detail-heading">
+    <div><div class="eyebrow">EVENT DETAIL</div><h1>{{ event.company_name }}</h1><p>{{ event.source }} · {{ event.country }}</p></div>
+    <span class="risk-badge risk-{{ event.risk_level|lower }}">{{ event.risk_level }}</span>
+  </div>
+  <section class="risk-summary"><strong>위험도 판단</strong><span>{{ event.risk_reason }}</span><span class="muted">actor: {{ event.risk_actor }}</span></section>
+
+  <div class="detail-grid">
+    <section class="panel">
+      <div class="panel-heading"><h2>현재 메타데이터</h2></div>
+      <dl class="metadata">
+        <dt>회사명</dt><dd>{{ event.company_name }}</dd>
+        <dt>회사 URL</dt><dd>{% if event.company_href %}<a href="{{ event.company_href }}" target="_blank" rel="noopener noreferrer">{{ event.company_url }} ↗</a>{% else %}{{ event.company_url }}{% endif %}</dd>
+        <dt>source</dt><dd>{{ event.source }}</dd>
+        <dt>국가</dt><dd>{{ event.country }}</dd>
+        <dt>규모</dt><dd>{{ event.data_size }}</dd>
+        <dt>게시일</dt><dd>{{ event.publication_date }}</dd>
+        <dt>유출 내용</dt><dd class="multiline">{{ event.data_contents }}</dd>
+        <dt>설명</dt><dd class="multiline">{{ event.description }}</dd>
+      </dl>
+    </section>
+    <section class="panel">
+      <div class="panel-heading"><h2>사건 식별 · 관찰 정보</h2></div>
+      <dl class="metadata">
+        <dt>문서 ID</dt><dd class="identifier">{{ event.document_id }}</dd>
+        <dt>event_key</dt><dd class="identifier">{{ event.event_key }}</dd>
+        <dt>식별 기준</dt><dd>{{ event.identity_basis }}</dd>
+        <dt>최초 관찰</dt><dd>{{ event.first_seen|date:"Y-m-d H:i:s"|default:"-" }} UTC</dd>
+        <dt>최근 관찰</dt><dd>{{ event.last_seen|date:"Y-m-d H:i:s"|default:"-" }} UTC</dd>
+        <dt>관찰 횟수</dt><dd>{{ event.observation_count|default_if_none:"-" }}</dd>
+        <dt>schema version</dt><dd>{{ event.schema_version|default_if_none:"-" }}</dd>
+      </dl>
+      <p class="panel-note">이전 스키마에 관찰 시각이 없으면 수집 시각을 표시합니다. 긴 메타데이터는 표시 길이를 제한합니다.</p>
+    </section>
+  </div>
+
+  <section class="panel section-space">
+    <div class="panel-heading"><h2>메타데이터 변경 이력</h2><span class="muted">최신순 · 최대 {{ history_limit }}건</span></div>
+    {% if history_more %}<p class="panel-note">최근 {{ history_limit }}건만 표시합니다.</p>{% endif %}
+    <div class="table-scroll">
+      <table class="history-table">
+        <thead><tr><th>변경 시각 (UTC)</th><th>변경 필드</th><th>변경 전</th><th>변경 후</th></tr></thead>
+        <tbody>
+        {% for item in history %}
+          {% for change in item.changes %}
+          <tr><td class="date-cell">{{ item.changed_at|date:"Y-m-d H:i:s"|default:"-" }}</td><td><strong>{{ change.label }}</strong><small>{{ change.field }}</small></td><td class="multiline">{{ change.before }}</td><td class="multiline">{{ change.after }}</td></tr>
+          {% empty %}<tr><td>{{ item.changed_at|date:"Y-m-d H:i:s"|default:"-" }}</td><td colspan="3">표시할 메타데이터 변경 필드가 없습니다.</td></tr>{% endfor %}
+        {% empty %}<tr><td colspan="4" class="empty-state">아직 기록된 변경 이력이 없습니다.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel section-space">
+    <div class="panel-heading"><h2>Telegram 알림 이력</h2><span class="muted">생성 시각 최신순 · 최대 {{ alert_limit }}건</span></div>
+    {% if alerts_more %}<p class="panel-note">최근 {{ alert_limit }}건만 표시합니다.</p>{% endif %}
+    <div class="table-scroll">
+      <table class="alert-table">
+        <thead><tr><th>유형</th><th>위험도</th><th>상태</th><th>시도</th><th>생성 시각 (UTC)</th><th>발송 시각 (UTC)</th><th>억제 사유</th><th>변경 필드</th></tr></thead>
+        <tbody>
+        {% for item in alerts %}
+          <tr><td>{{ item.event_type }}</td><td><span class="risk-badge risk-{{ item.risk_level|lower }}">{{ item.risk_level }}</span></td><td><span class="status-label">{{ item.status }}</span></td><td>{{ item.attempt_count|default_if_none:"-" }}</td><td class="date-cell">{{ item.created_at|date:"Y-m-d H:i:s"|default:"-" }}</td><td class="date-cell">{{ item.sent_at|date:"Y-m-d H:i:s"|default:"-" }}</td><td>{{ item.suppression_reason }}</td><td>{{ item.changed_fields|join:", "|default:"-" }}</td></tr>
+        {% empty %}<tr><td colspan="8" class="empty-state">아직 기록된 알림 이력이 없습니다.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

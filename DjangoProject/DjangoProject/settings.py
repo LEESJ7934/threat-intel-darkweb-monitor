@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -6,6 +7,11 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Canonical UI imports the repository's pure alert.risk module in manage.py,
+# runserver, WSGI and ASGI processes. This path is derived from this file.
+PROJECT_ROOT = BASE_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(BASE_DIR.parent / ".env")
 
 DEBUG = (
