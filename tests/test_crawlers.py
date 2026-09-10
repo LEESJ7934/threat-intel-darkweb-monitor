@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from pymongo.errors import PyMongoError
 from selenium.common.exceptions import TimeoutException, WebDriverException
 
-from crawling import common, models
+from crawling import common, models, storage
 from crawling import gunra_crawler as gunra
 from crawling import Black_Shrantac_crawler as black
 from crawling import dragonforce_crawler as dragon
@@ -284,7 +284,14 @@ class CrawlerRuntimeTests(unittest.TestCase):
         self.driver.find_elements.return_value = [object()]
         self.mongo = self.stack.enter_context(patch("crawling.common.MongoClient"))
         self.client = self.mongo.return_value
-        self.collection = self.client.__getitem__.return_value.__getitem__.return_value
+        self.collection = MagicMock()
+        self.history = MagicMock()
+        self.client.__getitem__.return_value.__getitem__.side_effect = {
+            "leaked_data": self.collection, "leak_history": self.history,
+        }.__getitem__
+        self.collection.find_one.return_value = None
+        self.collection.find.return_value = []
+        self.collection.update_one.return_value.upserted_id = "synthetic_insert"
         self.stack.enter_context(patch("crawling.common.LOGGER"))
 
     def test_all_crawlers_upsert_only_valid_items_and_close_resources(self):
@@ -292,6 +299,8 @@ class CrawlerRuntimeTests(unittest.TestCase):
             with self.subTest(source=module.SOURCE):
                 self.chrome.reset_mock()
                 self.mongo.reset_mock()
+                self.collection.reset_mock()
+                self.history.reset_mock()
                 self.driver.page_source = fixture(filename)
                 saved = module.crawl(self.config)
                 self.assertEqual(saved, 2)
@@ -301,18 +310,24 @@ class CrawlerRuntimeTests(unittest.TestCase):
                 self.driver.set_page_load_timeout.assert_called_once_with(60)
                 self.driver.quit.assert_called_once()
                 self.client.close.assert_called_once()
+                self.assertTrue(self.mongo.call_args.kwargs["tz_aware"])
+                self.assertIs(self.mongo.call_args.kwargs["tzinfo"], timezone.utc)
                 self.assertEqual(self.collection.update_one.call_count, 2)
                 ids = set()
                 for call in self.collection.update_one.call_args_list:
                     query, update = call.args
-                    record = update["$set"]
+                    record = update["$setOnInsert"]
                     ids.add(record["_id"])
-                    self.assertEqual(query, {"_id": record["_id"]})
+                    self.assertEqual(query, {"event_key": record["event_key"]})
                     self.assertEqual(call.kwargs, {"upsert": True})
                     self.assertEqual(record["source"], module.SOURCE)
                     self.assertIs(record["scraped_time"].tzinfo, timezone.utc)
                     self.assertNotIn("html", record)
+                    self.assertEqual(record["schema_version"], 2)
+                    self.assertEqual(record["observation_count"], 1)
+                    self.assertEqual(record["first_seen"], record["last_seen"])
                 self.assertEqual(len(ids), 2)
+                self.history.update_one.assert_not_called()
 
     def test_options_are_set_before_single_dragonforce_driver_creation(self):
         self.driver.page_source = fixture("dragonforce_sample.html")
@@ -383,12 +398,39 @@ class CrawlerRuntimeTests(unittest.TestCase):
         self.client.close.assert_called_once()
         self.driver.quit.assert_called_once()
 
-    def test_save_records_keeps_existing_upsert_contract_and_does_not_mutate_input(self):
+    def test_history_write_failure_closes_client_without_updating_current_document(self):
+        self.driver.page_source = fixture("gunra_sample.html")
+        previous = gunra.parse_html(self.driver.page_source, NOW)[0]
+        previous.update(data_size="5 GB", observation_count=1, first_seen=NOW, schema_version=2)
+        previous["event_key"], previous["identity_basis"] = storage.event_identity(previous)
+        self.collection.find_one.return_value = previous
+        self.history.update_one.side_effect = PyMongoError("synthetic history failure")
+        with self.assertRaises(PyMongoError):
+            gunra.crawl(self.config)
+        self.client.close.assert_called_once()
+        self.driver.quit.assert_called_once()
+        self.history.update_one.assert_called_once()
+        self.collection.update_one.assert_not_called()
+
+    def test_save_records_preserves_parser_id_and_adds_storage_fields_without_mutating_input(self):
         record = models.LeakRecord(_id="synthetic_id", scraped_time=NOW, source="test", source_url="https://fixture.example")
-        self.assertEqual(common.save_records(self.collection, [record]), 1)
-        self.collection.update_one.assert_called_once_with(
-            {"_id": "synthetic_id"}, {"$set": record.to_document()}, upsert=True)
+        self.assertEqual(common.save_records(self.collection, self.history, [record]), 1)
+        self.collection.update_one.assert_called_once()
+        call = self.collection.update_one.call_args
+        document = call.args[1]["$setOnInsert"]
+        self.assertEqual(call.args[0], {"event_key": document["event_key"]})
+        self.assertEqual(call.kwargs, {"upsert": True})
+        self.assertEqual(document["_id"], "synthetic_id")
+        for name, value in record.to_document().items():
+            if name != "schema_version":
+                self.assertEqual(document[name], value)
+        self.assertEqual(document["schema_version"], 2)
+        self.assertEqual(document["observation_count"], 1)
+        self.assertEqual(document["first_seen"], NOW)
+        self.assertEqual(document["last_seen"], NOW)
+        self.history.update_one.assert_not_called()
         self.assertEqual(record.scraped_time, NOW)
+        self.assertEqual(record.schema_version, 1)
 
     def test_mains_return_nonzero_and_hide_raw_exception_details(self):
         cases = ((TimeoutException("private metadata"), "TIMEOUT"),

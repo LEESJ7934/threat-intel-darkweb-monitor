@@ -52,7 +52,7 @@ class SchedulerConfigurationTests(
                 30,
             )
 
-    def test_all_crawlers_are_registered_once(self):
+    def test_only_bitlock_is_active_and_registered_once(self):
         scheduler = build_scheduler()
         jobs = scheduler.get_jobs()
 
@@ -73,9 +73,9 @@ class SchedulerConfigurationTests(
             actual_ids,
             expected_ids,
         )
-        self.assertEqual(actual_ids, {
-            "gunra_crawler", "Black_Shrantac_crawler", "dragonforce_crawler", "bitlock_crawler",
-        })
+        self.assertEqual(CRAWLER_MODULES, ("crawling.bitlock_crawler",))
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(actual_ids, {"bitlock_crawler"})
 
         for job in jobs:
             self.assertEqual(
@@ -87,10 +87,7 @@ class SchedulerConfigurationTests(
             self.assertEqual(job.trigger.interval, timedelta(minutes=scheduler_module.CRAWLER_INTERVAL_MINUTES))
             self.assertEqual(tuple(job.args), ("crawling." + job.id,))
 
-        self.assertEqual(
-            [jobs[index + 1].next_run_time - jobs[index].next_run_time for index in range(3)],
-            [timedelta(seconds=15)] * 3,
-        )
+        self.assertEqual(jobs[0].next_run_time.tzinfo, scheduler_module.KST)
 
     @patch("scheduler.scheduler.subprocess.run")
     @patch("scheduler.scheduler.log")
@@ -103,7 +100,8 @@ class SchedulerConfigurationTests(
                 capture_output=True, text=True, timeout=scheduler_module.CRAWLER_TIMEOUT_SECONDS,
                 check=False,
             )
-        self.assertEqual(run.call_count, 4)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0], [sys.executable, "-m", "crawling.bitlock_crawler"])
 
     @patch("scheduler.scheduler.log")
     @patch("scheduler.scheduler.subprocess.run", side_effect=subprocess.TimeoutExpired("crawler", 600))
@@ -127,8 +125,20 @@ class SchedulerConfigurationTests(
     @patch("scheduler.scheduler.log")
     @patch("scheduler.scheduler.subprocess.run")
     def test_unregistered_module_is_not_executed(self, run, log):
-        scheduler_module.run_crawler("unregistered.module")
+        for module in ("unregistered.module", "crawling.gunra_crawler",
+                       "crawling.Black_Shrantac_crawler", "crawling.dragonforce_crawler"):
+            scheduler_module.run_crawler(module)
         run.assert_not_called()
+
+    @patch("scheduler.scheduler.log")
+    @patch("scheduler.scheduler.subprocess.run")
+    def test_failed_run_does_not_prevent_the_next_bitlock_run(self, run, log):
+        run.side_effect = [subprocess.TimeoutExpired("crawler", 600),
+                           SimpleNamespace(stdout="", stderr="", returncode=0)]
+        scheduler_module.run_crawler(CRAWLER_MODULES[0])
+        scheduler_module.run_crawler(CRAWLER_MODULES[0])
+        self.assertEqual(run.call_count, 2)
+        self.assertIn("실행 완료", log.call_args.args[0])
 
     @patch("scheduler.scheduler.log")
     @patch("scheduler.scheduler.subprocess.run")

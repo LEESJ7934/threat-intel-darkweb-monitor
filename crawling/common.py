@@ -21,6 +21,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from crawling.models import LeakRecord
+from crawling.storage import save_records
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOGGER = logging.getLogger(__name__)
@@ -125,8 +126,9 @@ def mongo_collection(config: CrawlerConfig):
     client = None
     try:
         client = MongoClient(config.db_uri, serverSelectionTimeoutMS=10_000,
-                             connectTimeoutMS=10_000)
-        yield client[config.db_name]["leaked_data"]
+                             connectTimeoutMS=10_000, tz_aware=True, tzinfo=timezone.utc)
+        database = client[config.db_name]
+        yield database["leaked_data"], database["leak_history"]
     finally:
         if client is not None:
             client.close()
@@ -161,16 +163,6 @@ def parse_records(html: str, *, selector: str, source: str, source_url: str,
     return records
 
 
-def save_records(collection, records) -> int:
-    """Preserve the existing _id-based upsert. No history or identity migration."""
-    count = 0
-    for record in records:
-        document = record.to_document() if isinstance(record, LeakRecord) else dict(record)
-        collection.update_one({"_id": document["_id"]}, {"$set": document}, upsert=True)
-        count += 1
-    return count
-
-
 def crawl_page(*, source_url: str, selector: str, parser, config=None) -> int:
     config = config if config is not None else load_config()
     with browser(config) as driver:
@@ -179,8 +171,8 @@ def crawl_page(*, source_url: str, selector: str, parser, config=None) -> int:
     # Loading/parsing failures never open MongoDB; the driver is already closed.
     if not records:
         return 0
-    with mongo_collection(config) as collection:
-        return save_records(collection, records)
+    with mongo_collection(config) as (collection, history):
+        return save_records(collection, history, records)
 
 
 def run_main(source: str, crawl) -> int:
