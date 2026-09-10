@@ -42,16 +42,18 @@ def is_http_url(value: str) -> bool:
     )
 
 
-def validate_config() -> list[str]:
+def validate_config(environ=None) -> list[str]:
     errors = []
 
-    if not ENV_FILE.is_file():
-        return ["프로젝트 최상단에 .env 파일이 없습니다."]
+    if environ is None:
+        if not ENV_FILE.is_file():
+            return ["프로젝트 최상단에 .env 파일이 없습니다."]
 
-    load_dotenv(ENV_FILE, override=False)
+        load_dotenv(ENV_FILE, override=False)
+        environ = os.environ
 
     for name in REQUIRED_SETTINGS:
-        value = os.getenv(name, "").strip()
+        value = environ.get(name, "").strip()
 
         if not value:
             errors.append(
@@ -62,7 +64,7 @@ def validate_config() -> list[str]:
                 f"{name}에 예시값이 아닌 실제 로컬 설정값을 입력하세요."
             )
 
-    db_uri = os.getenv("DB_URI", "").strip()
+    db_uri = environ.get("DB_URI", "").strip()
 
     if (
         db_uri
@@ -75,7 +77,7 @@ def validate_config() -> list[str]:
             "mongodb+srv://로 시작해야 합니다."
         )
 
-    chat_id = os.getenv(
+    chat_id = environ.get(
         "TELEGRAM_CHAT_ID",
         "",
     ).strip()
@@ -92,7 +94,7 @@ def validate_config() -> list[str]:
         "ELASTICSEARCH_URL",
         "KIBANA_URL",
     ):
-        value = os.getenv(name, "").strip()
+        value = environ.get(name, "").strip()
 
         if value and not is_http_url(value):
             errors.append(
@@ -100,7 +102,7 @@ def validate_config() -> list[str]:
                 "https:// URL이어야 합니다."
             )
 
-    debug_value = os.getenv(
+    debug_value = environ.get(
         "DJANGO_DEBUG",
         "True",
     ).strip().lower()
@@ -111,7 +113,7 @@ def validate_config() -> list[str]:
             "yes/no 또는 on/off 중 하나여야 합니다."
         )
 
-    secret_key = os.getenv(
+    secret_key = environ.get(
         "DJANGO_SECRET_KEY",
         "",
     ).strip()
@@ -125,7 +127,7 @@ def validate_config() -> list[str]:
             "DJANGO_SECRET_KEY가 필요합니다."
         )
 
-    allowed_hosts = os.getenv(
+    allowed_hosts = environ.get(
         "DJANGO_ALLOWED_HOSTS",
         "",
     ).strip()
@@ -139,6 +141,14 @@ def validate_config() -> list[str]:
             "DJANGO_ALLOWED_HOSTS를 설정해야 합니다."
         )
 
+    minimum = environ.get("ALERT_MIN_LEVEL", "MEDIUM").strip()
+    if minimum not in {"CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"}:
+        errors.append("ALERT_MIN_LEVEL는 CRITICAL/HIGH/MEDIUM/LOW/INFO 중 하나여야 합니다.")
+    for name, default in (("ALERT_MAX_ATTEMPTS", "5"), ("ALERT_RETRY_SECONDS", "60"),
+                          ("ALERT_LEASE_SECONDS", "120")):
+        value = environ.get(name, default).strip()
+        if not value.isascii() or not value.isdigit() or int(value) <= 0:
+            errors.append(f"{name}는 양의 정수여야 합니다.")
     return errors
 
 
