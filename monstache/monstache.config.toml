@@ -1,23 +1,49 @@
-# MongoDB URL is supplied through MONSTACHE_MONGO_URL.
-# Never store credentials in this file.
-
-# Elasticsearch
+# Monstache 6.7.7: -tpl -f; Go template dot is the environment map.
+# Credentials are supplied only through MONSTACHE_MONGO_URL.
 elasticsearch-urls = ["http://elasticsearch:9200"]
-
-# Synchronization options
-resume = true
-resume-write-unsafe = true
+direct-read-namespaces = [
+  "{{index . "DB_NAME"}}.leaked_data",
+  "{{index . "DB_NAME"}}.leak_history",
+  "{{index . "DB_NAME"}}.alert_log"
+]
+change-stream-namespaces = [
+  "{{index . "DB_NAME"}}.leaked_data",
+  "{{index . "DB_NAME"}}.leak_history",
+  "{{index . "DB_NAME"}}.alert_log"
+]
+direct-read-stateful = true
 exit-after-direct-reads = false
+# Separate metadata DB; token and completed-read state are scoped by resume-name.
+config-database-name = "monstache"
+resume = true
+resume-strategy = 1
+resume-name = "{{index . "DB_NAME"}}:{{index . "ELK_INDEX_PREFIX"}}:day12-v1"
+resume-write-unsafe = false
+dropped-collections = false
+dropped-databases = false
+delete-index-pattern = "{{index . "ELK_INDEX_PREFIX"}}-events,{{index . "ELK_INDEX_PREFIX"}}-history,{{index . "ELK_INDEX_PREFIX"}}-alerts"
+index-as-update = false
+elasticsearch-retry = true
+elasticsearch-client-timeout = 15
+verbose = false
 enable-http-server = true
 http-server-addr = ":8080"
-dropped-collections = true
-dropped-databases = true
-
-# MongoDB collection to synchronize
-namespace-regex = '^darkweb\.leaked_data$'
-direct-read-namespaces = ["darkweb.leaked_data"]
-
-# MongoDB collection to Elasticsearch index mapping
+stats = true
 [[mapping]]
-namespace = "darkweb.leaked_data"
-index = "leaked_data"
+namespace = "{{index . "DB_NAME"}}.leaked_data"
+index = "{{index . "ELK_INDEX_PREFIX"}}-events"
+[[mapping]]
+namespace = "{{index . "DB_NAME"}}.leak_history"
+index = "{{index . "ELK_INDEX_PREFIX"}}-history"
+[[mapping]]
+namespace = "{{index . "DB_NAME"}}.alert_log"
+index = "{{index . "ELK_INDEX_PREFIX"}}-alerts"
+[[script]]
+namespace = "{{index . "DB_NAME"}}.leaked_data"
+path = "/config/project_document.js"
+[[script]]
+namespace = "{{index . "DB_NAME"}}.leak_history"
+path = "/config/project_document.js"
+[[script]]
+namespace = "{{index . "DB_NAME"}}.alert_log"
+path = "/config/project_document.js"
