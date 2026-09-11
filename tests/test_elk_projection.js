@@ -83,3 +83,20 @@ test("supported integers and alerts persisted risk pass through without reclassi
 test("unsupported collection fails rather than returning false to schedule a deletion", () => {
     assert.throws(() => project({_id: "x"}, "alert_state"), /unsupported namespace/);
 });
+
+test("Day13 private key block and quoted assignments do not reach ES", () => {
+    const header = "-----BEGIN " + "PRIVATE KEY-----";
+    const footer = "-----END " + "PRIVATE KEY-----";
+    const raw = header + "\nSYNTHETIC-KEY-BODY\n" + footer + ' token="PRIVATE WORDS" ftp://user:FTP_SECRET@host.invalid/';
+    const out = project({description: raw}, "leaked_data");
+    assert.ok(!out.description.includes("SYNTHETIC-KEY-BODY"));
+    assert.ok(!out.description.includes("PRIVATE WORDS"));
+    assert.ok(!out.description.includes("FTP_SECRET"));
+    assert.ok(out.description.includes("[redacted]"));
+});
+
+test("Day13 redaction preserves ordinary names and URLs", () => {
+    const doc = {company_name: "Example Company", company_url: "https://company.example/about",
+        description: "password policy and token-based service"};
+    assert.deepEqual(project(doc, "leaked_data"), doc);
+});

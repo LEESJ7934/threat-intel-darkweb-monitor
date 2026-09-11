@@ -4,6 +4,13 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
+# This pre-Day11 duplicate lacks the canonical dashboard's projections and auth.
+# Fail closed for manage.py, WSGI and ASGI rather than expose a second open UI.
+raise ImproperlyConfigured(
+    "Legacy webapp entry point is disabled. Use DjangoProject/manage.py "
+    "or the canonical DjangoProject WSGI/ASGI application."
+)
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")

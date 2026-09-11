@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from governance.policy import RETENTION_SETTINGS, PolicyError, dashboard_config_errors, positive_days
+
 ENV_FILE = PROJECT_ROOT / ".env"
 
 REQUIRED_SETTINGS = (
@@ -154,6 +158,12 @@ def validate_config(environ=None) -> list[str]:
     prefix = environ.get("ELK_INDEX_PREFIX", "darkweb-monitor")
     if not isinstance(prefix, str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", prefix, re.ASCII) is None:
         errors.append("ELK_INDEX_PREFIX는 소문자/숫자로 시작하는 1~64자의 소문자, 숫자, -, _만 허용합니다.")
+    errors.extend(dashboard_config_errors(environ))
+    for name, default, _, _ in RETENTION_SETTINGS.values():
+        try:
+            positive_days(environ.get(name, str(default)), name)
+        except PolicyError as error:
+            errors.append(str(error))
     return errors
 
 

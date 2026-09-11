@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from bson import ObjectId
 from bs4 import BeautifulSoup
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from pymongo.errors import PyMongoError
 
@@ -239,6 +239,7 @@ class ReadClient:
         self.closed = True
 
 
+@override_settings(DEBUG=True, DASHBOARD_REQUIRE_AUTH=False)
 class DashboardTests(SimpleTestCase):
     def setUp(self):
         self.enterContext(patch.dict(os.environ, {"DB_URI": "mongodb://unused", "DB_NAME": "synthetic"}, clear=False))

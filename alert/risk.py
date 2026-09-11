@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 import re
 from urllib.parse import urlsplit
 
+from governance.policy import redact_credentials
+
 LEVELS = ("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL")
 MATERIAL_FIELDS = ("company_name", "company_url", "country", "data_contents",
                    "data_size", "description")
@@ -24,11 +26,7 @@ def text_value(value):
 
 def safe_text(value, *, secrets=(), limit=500):
     """Allow plain metadata; redact configured credentials and recognizable URIs/tokens."""
-    value = text_value(value)
-    for secret in sorted((str(s) for s in secrets if s), key=len, reverse=True):
-        value = value.replace(secret, "[redacted]")
-    value = re.sub(r"mongodb(?:\+srv)?://[^\s<>]+", "[redacted]", value, flags=re.I)
-    value = re.sub(r"\b\d{8,12}:[A-Za-z0-9_-]{30,}\b", "[redacted]", value)
+    value = text_value(redact_credentials(value, secrets=secrets))
     value = re.sub(r"<[^>]*>", "", value)
     return value[:limit] or "unknown"
 

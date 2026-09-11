@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="referrer" content="no-referrer">
+  <meta name="referrer" content="same-origin">
   <title>{% block title %}다크웹 위협 인텔리전스{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
 </head>
@@ -13,6 +13,11 @@
     <div class="header-inner">
       <a class="brand" href="{% url 'latest_data_table' %}"><span class="brand-mark">TI</span><span>위협 인텔리전스<span class="brand-caption">ANALYST DASHBOARD</span></span></a>
       <span class="read-only"><span aria-hidden="true">●</span> 조회 전용</span>
+      {% if request.user.is_authenticated %}
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}<button type="submit">로그아웃</button>
+      </form>
+      {% endif %}
     </div>
   </header>
   <main class="page-shell">{% block content %}{% endblock %}</main>
