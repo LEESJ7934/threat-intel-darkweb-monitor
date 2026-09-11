@@ -137,10 +137,8 @@ def safe_text(value, limit=500, secrets=()):
     if not isinstance(value, str):
         return "-"
     value = value.strip() or "-"
-    for secret in sorted((str(item) for item in secrets if item), key=len, reverse=True):
-        value = value.replace(secret, "[redacted]")
-    value = re.sub(r"mongodb(?:\+srv)?://[^\s<>\"']+", "[redacted]", value, flags=re.I)
-    value = re.sub(r"\b\d{8,12}:[A-Za-z0-9_-]{30,}\b", "[redacted]", value)
+    from governance.policy import redact_credentials
+    value = redact_credentials(value, secrets=secrets)
     return value[:limit]
 
 

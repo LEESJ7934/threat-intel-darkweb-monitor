@@ -12,7 +12,8 @@ from pymongo import ASCENDING
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from crawling.models import (LeakRecord, METADATA_FIELDS, UNKNOWN, canonical_metadata,
-                             canonical_url, metadata_text, normalized_metadata)
+                             canonical_url, metadata_text)
+from governance.policy import bounded_metadata as normalized_metadata, bounded_source
 
 LEGACY_PREFIXES = {"gunra": "gunra_", "black_shrantac": "black_shrantac",
                    "dragonforce": "dragonforce_", "bitlock": "bitlock_"}
@@ -97,7 +98,7 @@ def _incoming(record) -> dict:
     raw = record.to_document() if isinstance(record, LeakRecord) else dict(record)
     if raw.get("_id") is None or (isinstance(raw["_id"], str) and not raw["_id"].strip()):
         raise ValueError("A parser document ID is required")
-    result = {**normalized_metadata(raw), "_id": raw["_id"], "source": record_source(raw),
+    result = {**normalized_metadata(raw), "_id": raw["_id"], "source": bounded_source(record_source(raw)),
               "scraped_time": _utc(raw.get("scraped_time"))}
     event_identity(result)  # Validate before writes, without accepting supplied storage fields.
     return result

@@ -2,12 +2,14 @@ import logging
 
 from django.shortcuts import render
 from django.views.decorators.http import require_safe
+from governance.django_controls import protected_view
 
 from . import dashboard
 
 LOGGER = logging.getLogger(__name__)
 
 
+@protected_view("dashboard")
 @require_safe
 def latest_data_table(request):
     filters, errors = dashboard.parse_filters(request.GET)
@@ -25,6 +27,7 @@ def latest_data_table(request):
     return render(request, "mongoDbConnect/table.html", context)
 
 
+@protected_view("event_detail")
 @require_safe
 def event_detail(request, document_id):
     context = {"event": None, "history": [], "alerts": [], "database_error": None, "not_found": False}

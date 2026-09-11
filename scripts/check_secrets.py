@@ -44,7 +44,8 @@ RULES = {
         re.IGNORECASE,
     ),
     "hardcoded_django_secret": re.compile(
-        r"SECRET_KEY\s*=\s*['\"]REMOVED_DJANGO_SECRET'\"]+['\"]"
+        r"\b(?:DJANGO_)?SECRET_KEY\s*=\s*['\"]"
+        r"(?!dev-only-|replace_|REMOVED_)[^'\"\r\n]{50,}['\"]"
     ),
 }
 

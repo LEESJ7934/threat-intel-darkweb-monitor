@@ -10,11 +10,13 @@ from dotenv import load_dotenv
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from governance.sources import active_modules
+
 load_dotenv(PROJECT_ROOT / ".env")
 
-CRAWLER_MODULES = (
-    "crawling.bitlock_crawler",
-)
+CRAWLER_MODULES = active_modules()
 
 KST = timezone(timedelta(hours=9))
 
@@ -58,7 +60,7 @@ def log(message: str) -> None:
 
 
 def run_crawler(module_name: str) -> None:
-    if module_name not in CRAWLER_MODULES:
+    if module_name not in active_modules():
         log("등록되지 않은 크롤러 모듈")
         return
 
@@ -132,7 +134,7 @@ def build_scheduler() -> BlockingScheduler:
     first_run = datetime.now(KST)
 
     for index, module_name in enumerate(
-        CRAWLER_MODULES
+        active_modules()
     ):
         job_id = module_name.rsplit(".", 1)[1]
 

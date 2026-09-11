@@ -7,10 +7,11 @@ var metadata = ["company_name", "company_url", "country", "data_contents",
 var material = ["company_name", "company_url", "country", "data_contents", "data_size", "description"];
 function clean(value) {
     if (typeof value !== "string") { return null; }
-    return value.replace(/mongodb(?:\+srv)?:\/\/[^\s<>"']+/gi, "[redacted]")
+    return value.replace(/-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z0-9]+ )?PRIVATE KEY-----|$)/gi, "[redacted]")
+        .replace(/mongodb(?:\+srv)?:\/\/[^\s<>"']+/gi, "[redacted]")
         .replace(/\b\d{8,12}:[A-Za-z0-9_-]{30,}\b/g, "[redacted]")
-        .replace(/https?:\/\/[^\/\s@]+@/gi, "https://[redacted]@")
-        .replace(/\b(?:password|passwd|token|api[_-]?key|secret)\s*[:=]\s*[^\s,;]+/gi, "[redacted]")
+        .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s\/@<>]+@[^\s<>"']+/gi, "[redacted]")
+        .replace(/\b(?:password|passwd|token|api[_-]?key|secret)\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;<>]+)/gi, "[redacted]")
         .replace(/^\s+|\s+$/g, "").slice(0, 8000);
 }
 function copyText(out, doc, fields) {

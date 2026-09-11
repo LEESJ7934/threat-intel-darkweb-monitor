@@ -14,12 +14,25 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(BASE_DIR.parent / ".env")
 
-DEBUG = (
-    os.getenv("DJANGO_DEBUG", "True")
-    .strip()
-    .lower()
-    in {"1", "true", "yes", "on"}
-)
+from governance.policy import boolean, dashboard_config_errors
+
+_security_errors = dashboard_config_errors(os.environ)
+if _security_errors:
+    raise ImproperlyConfigured("; ".join(_security_errors))
+DEBUG = boolean(os.getenv("DJANGO_DEBUG", "True"), "DJANGO_DEBUG")
+DASHBOARD_REQUIRE_AUTH = boolean(os.getenv("DASHBOARD_REQUIRE_AUTH", "True"), "DASHBOARD_REQUIRE_AUTH")
+_secure_cookies = boolean(os.getenv("DJANGO_SECURE_COOKIES", "False"), "DJANGO_SECURE_COOKIES")
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = _secure_cookies
+CSRF_COOKIE_SECURE = _secure_cookies
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = "same-origin"
+# HTTPS/HSTS/proxy termination must be configured for the actual deployment;
+# localhost HTTP stays usable. See governance/data_handling.md.
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "latest_data_table"
+LOGOUT_REDIRECT_URL = "login"
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
