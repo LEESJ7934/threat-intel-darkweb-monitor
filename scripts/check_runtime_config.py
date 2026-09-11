@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -149,6 +150,10 @@ def validate_config(environ=None) -> list[str]:
         value = environ.get(name, default).strip()
         if not value.isascii() or not value.isdigit() or int(value) <= 0:
             errors.append(f"{name}는 양의 정수여야 합니다.")
+    # Missing setting keeps the documented default; an explicit empty value is invalid.
+    prefix = environ.get("ELK_INDEX_PREFIX", "darkweb-monitor")
+    if not isinstance(prefix, str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", prefix, re.ASCII) is None:
+        errors.append("ELK_INDEX_PREFIX는 소문자/숫자로 시작하는 1~64자의 소문자, 숫자, -, _만 허용합니다.")
     return errors
 
 

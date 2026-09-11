@@ -15,13 +15,22 @@ services:
     volumes:
       - esdata:/usr/share/elasticsearch/data
 
+    # curl is installed by the upstream Elasticsearch 8.15.3 Dockerfile.
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "5", "http://localhost:9200/"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 60s
+
   kibana:
     image: docker.elastic.co/kibana/kibana:8.15.3
     container_name: darkweb-kibana
     restart: unless-stopped
 
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
 
     environment:
       ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
@@ -29,22 +38,49 @@ services:
     ports:
       - "127.0.0.1:5601:5601"
 
+    # Bundled Node runtime: no curl/wget assumption in the Kibana image.
+    healthcheck:
+      test:
+        - CMD
+        - /usr/share/kibana/node/bin/node
+        - -e
+        - >-
+          const h=require('http');const r=h.get('http://127.0.0.1:5601/api/status',s=>{
+          let b='';s.on('data',d=>b+=d);s.on('end',()=>{try{
+          const j=JSON.parse(b);process.exit(s.statusCode===200&&j.status.overall.level==='available'?0:1);
+          }catch(e){process.exit(1);}});});r.setTimeout(5000,()=>{r.destroy();process.exit(1);});
+          r.on('error',()=>process.exit(1));
+      interval: 10s
+      timeout: 6s
+      retries: 18
+      start_period: 60s
+
   monstache:
     image: rwynn/monstache:6.7.7
     container_name: darkweb-monstache
     restart: unless-stopped
+    # Install templates/data views with setup_elk.py before enabling this profile.
+    profiles: ["sync"]
 
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
 
     volumes:
       - ./monstache/monstache.config.toml:/config/monstache.config.toml:ro
+      - ./monstache/project_document.js:/config/project_document.js:ro
 
     environment:
       MONSTACHE_MONGO_URL: "${DB_URI:?DB_URI must be set in .env}"
       MONSTACHE_ES_URLS: "http://elasticsearch:9200"
+      DB_NAME: "${DB_NAME:?DB_NAME must be set in .env}"
+      ELK_INDEX_PREFIX: "${ELK_INDEX_PREFIX-darkweb-monitor}"
+
+    ports:
+      - "127.0.0.1:8080:8080"
 
     command:
+      - "-tpl"
       - "-f"
       - "/config/monstache.config.toml"
 
